@@ -1,44 +1,33 @@
 # agent.py
 import os
 import random
+import time
 import requests
 from bs4 import BeautifulSoup
-from prompts import ENGLISH_TECH_PROMPT
-
-DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY")
-SERVERCHAN_SENDKEY = os.getenv("SERVERCHAN_SENDKEY")
 
 # === 非技术主题库（文学/思维/写作/科普）===
 NON_TECH_TOPICS = [
-    # 文学与思想
+    "Why Reading Fiction Builds Better Minds",
     "How Shakespeare’s Language Shapes Modern English",
     "What '1984' Teaches Us About Digital Privacy",
-    "Why Metaphors in Poetry Help Us Understand Technology",
-    "The Power of Storytelling in Technical Documentation",
-    "How Jane Austen’s Dialogue Reveals Human Nature",
-    
-    # 写作与沟通
-    "Why Clear Writing Is a Sign of Clear Thinking",
-    "The Art of the One-Sentence Summary",
-    "How to Explain Complex Ideas Simply",
-    
-    # 思维与学习
+    "The Art of Writing Clear Technical Documentation",
     "Why Curiosity Beats Memorization in Learning",
-    "How to Build Mental Models for Problem Solving",
-    "The Difference Between Being Smart and Being Wise",
-    
-    # 语言与文化
-    "Why English Has So Many Words for 'Big'",
-    "How Idioms Reveal Cultural Values",
-    "The Hidden Logic Behind English Phrasal Verbs"
+    "How to Explain Complex Ideas Simply",
+    "The Power of Analogies in Communication",
+    "Why Silence Helps You Think Better",
+    "How Metaphors Shape Our Understanding of Technology",
+    "The Difference Between Knowledge and Wisdom"
 ]
 
 def get_github_trending_topics():
-    """获取 GitHub 本周热门技术主题"""
+    """从 GitHub Trending 获取本周热门技术主题（国内可访问）"""
     url = "https://github.com/trending?since=weekly"
-    headers = {"User-Agent": "Mozilla/5.0"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
     try:
         resp = requests.get(url, headers=headers, timeout=10)
+        resp.raise_for_status()
         soup = BeautifulSoup(resp.text, 'html.parser')
         topics = []
         for repo in soup.select('article')[:8]:
@@ -52,77 +41,104 @@ def get_github_trending_topics():
             topics.append(topic[:90])
         return topics
     except Exception as e:
-        print(f"⚠️ GitHub Trending 抓取失败: {e}")
+        print(f"⚠️ 获取 GitHub Trending 失败: {e}")
         return []
 
-def call_qwen(prompt: str) -> str:
+def call_qwen(prompt: str, max_retries=3) -> str:
+    """调用 Qwen API，带重试和超时处理"""
+    DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY")
+    if not DASHSCOPE_API_KEY:
+        raise Exception("DASHSCOPE_API_KEY 未设置")
+
     url = "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation"
-    headers = {"Authorization": f"Bearer {DASHSCOPE_API_KEY}", "Content-Type": "application/json"}
+    headers = {
+        "Authorization": f"Bearer {DASHSCOPE_API_KEY}",
+        "Content-Type": "application/json"
+    }
     data = {
         "model": "qwen-max",
         "input": {"messages": [{"role": "user", "content": prompt}]},
         "parameters": {"max_tokens": 1200}
     }
-    resp = requests.post(url, headers=headers, json=data, timeout=30)
-    if resp.status_code == 200:
-        return resp.json()["output"]["text"]
-    else:
-        raise Exception(f"Qwen error: {resp.status_code} - {resp.text}")
 
-def send_to_wechat(title: str, content: str):
-    if not SERVERCHAN_SENDKEY:
-        print("⚠️ WeChat push skipped (no key)")
-        return
-    url = f"https://sctapi.ftqq.com/{SERVERCHAN_SENDKEY}.send"
-    requests.post(url, data={"title": title, "desp": content}, timeout=10)
+    for attempt in range(max_retries):
+        try:
+            resp = requests.post(url, headers=headers, json=data, timeout=60)
+            if resp.status_code == 200:
+                result = resp.json()
+                if "output" in result and "text" in result["output"]:
+                    return result["output"]["text"]
+                else:
+                    raise Exception(f"Unexpected API response: {result}")
+            else:
+                error_msg = resp.json().get("message", resp.text)
+                print(f"❌ Qwen API 错误 (尝试 {attempt+1}/{max_retries}): {resp.status_code} - {error_msg}")
+        except requests.exceptions.RequestException as e:
+            print(f"❌ 网络错误 (尝试 {attempt+1}/{max_retries}): {e}")
+
+        if attempt < max_retries - 1:
+            time.sleep(5)  # 等待后重试
+
+    raise Exception("Qwen API 调用失败，已重试多次")
 
 def main():
-    print("🔍 获取技术主题...")
+    print("🔍 正在获取 GitHub 本周热门技术主题...")
     tech_topics = get_github_trending_topics()
     
-    # 如果抓取失败，用备用技术主题
+    # 备用技术主题（抓取失败时使用）
     if not tech_topics:
         tech_topics = [
             "Understanding Modern API Design",
             "Why Observability Matters in Cloud Systems",
             "The Rise of AI-Powered Development Tools"
         ]
+        print("🔄 使用备用技术主题")
     
-    # 选 2 个技术主题
+    # 选择 2 个技术主题 + 1 个非技术主题
     selected_tech = random.sample(tech_topics, min(2, len(tech_topics)))
-    
-    # 选 1 个非技术主题
     non_tech = [random.choice(NON_TECH_TOPICS)]
-    
     all_topics = selected_tech + non_tech
-    random.shuffle(all_topics)  # 打乱顺序，避免固定模式
+    random.shuffle(all_topics)  # 打乱顺序
 
     articles = []
     for i, topic in enumerate(all_topics, 1):
-        print(f"📝 生成第 {i} 篇: {topic[:50]}...")
+        print(f"📝 正在生成第 {i} 篇: {topic[:50]}...")
         try:
-            prompt = ENGLISH_TECH_PROMPT.format(topic=topic)
+            # 构造提示词（确保与 prompts.py 一致）
+            prompt = f"""You are a senior tech writer creating content for Chinese developers who want to improve their English reading skills.
+
+Write a short article (400–600 words) in clear, natural English about the following topic:
+
+Topic: {topic}
+
+Requirements:
+1. Use fluent, professional but accessible English — like articles on Medium or official documentation.
+2. Focus on explaining concepts, trends, or best practices. DO NOT include code snippets, config files, or architecture diagrams.
+3. Use real-world context so readers can guess word meanings from sentences.
+4. After the article, add a section titled exactly:
+   ## 🔑 Key Vocabulary
+   List 5–8 technical terms that might be unfamiliar to intermediate learners, in this format:
+   - **term**: Chinese meaning (brief explanation in tech context)
+5. Output ONLY valid Markdown. No greetings, no summary, no extra sections.
+6. Keep sentences clear and engaging. Avoid overly complex grammar.
+"""
             article = call_qwen(prompt)
             articles.append(f"## 📝 {topic}\n\n{article}\n---\n")
         except Exception as e:
-            print(f"❌ 失败: {e}")
+            print(f"❌ 生成失败: {e}")
             continue
 
     if not articles:
-        print("❌ 无文章生成")
-        return
+        raise Exception("所有文章生成失败，无法继续")
 
+    # ✅ 关键修复：定义 full_content
     full_content = "\n".join(articles)
-    
-    # send_to_wechat("📚 Weekly English Digest (Tech + Mind)", full_content)
-    # print("✅ 已推送至微信！")
 
-    with open("latest_digest.md", "w") as f:
+    # 保存到文件（供后续 deploy 使用）
+    with open("latest_digest.md", "w", encoding="utf-8") as f:
         f.write(full_content)
-    print("✅ 文章已保存为 latest_digest.md")
 
-    # with open("latest_digest.md", "w") as f:
-        # f.write(full_content)
+    print("✅ 文章已成功保存为 latest_digest.md")
 
 if __name__ == "__main__":
     main()
