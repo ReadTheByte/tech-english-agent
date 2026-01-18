@@ -112,7 +112,8 @@ def main():
         print("❌ 无文章生成")
         return
 
-    # full_content = "\n".join(articles)
+    full_content = "\n".join(articles)
+    
     # send_to_wechat("📚 Weekly English Digest (Tech + Mind)", full_content)
     # print("✅ 已推送至微信！")
 
