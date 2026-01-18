@@ -112,12 +112,16 @@ def main():
         print("❌ 无文章生成")
         return
 
-    full_content = "\n".join(articles)
-    send_to_wechat("📚 Weekly English Digest (Tech + Mind)", full_content)
-    print("✅ 已推送至微信！")
+    # full_content = "\n".join(articles)
+    # send_to_wechat("📚 Weekly English Digest (Tech + Mind)", full_content)
+    # print("✅ 已推送至微信！")
 
     with open("latest_digest.md", "w") as f:
         f.write(full_content)
+    print("✅ 文章已保存为 latest_digest.md")
+
+    # with open("latest_digest.md", "w") as f:
+        # f.write(full_content)
 
 if __name__ == "__main__":
     main()
