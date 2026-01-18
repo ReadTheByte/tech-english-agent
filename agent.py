@@ -10,16 +10,27 @@ SERVERCHAN_SENDKEY = os.getenv("SERVERCHAN_SENDKEY")
 
 # === 非技术主题库（文学/思维/写作/科普）===
 NON_TECH_TOPICS = [
-    "Why Reading Fiction Builds Better Minds",
-    "The Art of Writing Clear Technical Documentation",
-    "How to Learn Anything Deeply (Without Burning Out)",
-    "What Makes a Sentence Beautiful?",
-    "The Power of Analogies in Communication",
-    "Why Curiosity Is the Engine of Learning",
-    "How Silence Helps You Think Better",
-    "The Difference Between Knowledge and Wisdom",
-    "Why Good Explanations Matter in Engineering",
-    "How Metaphors Shape Our Understanding of Technology"
+    # 文学与思想
+    "How Shakespeare’s Language Shapes Modern English",
+    "What '1984' Teaches Us About Digital Privacy",
+    "Why Metaphors in Poetry Help Us Understand Technology",
+    "The Power of Storytelling in Technical Documentation",
+    "How Jane Austen’s Dialogue Reveals Human Nature",
+    
+    # 写作与沟通
+    "Why Clear Writing Is a Sign of Clear Thinking",
+    "The Art of the One-Sentence Summary",
+    "How to Explain Complex Ideas Simply",
+    
+    # 思维与学习
+    "Why Curiosity Beats Memorization in Learning",
+    "How to Build Mental Models for Problem Solving",
+    "The Difference Between Being Smart and Being Wise",
+    
+    # 语言与文化
+    "Why English Has So Many Words for 'Big'",
+    "How Idioms Reveal Cultural Values",
+    "The Hidden Logic Behind English Phrasal Verbs"
 ]
 
 def get_github_trending_topics():
