@@ -1,9 +1,10 @@
+# .github/workflows/publish.yml
 name: Publish Tech English Digest
 
 on:
   schedule:
-    - cron: '0 12 * * 0'  # 每周日 20:00（北京时间 = UTC+8，所以 UTC 是 12:00）
-  workflow_dispatch:      # 支持手动触发
+    - cron: '0 12 * * 0'  # 每周日 UTC 12:00 = 北京时间 20:00
+  workflow_dispatch:        # 允许手动触发
 
 jobs:
   generate:
@@ -18,7 +19,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install requests markdown beautifulsoup4
+          pip install -r requirements.txt
 
       - name: Generate digest
         env:
@@ -43,9 +44,17 @@ jobs:
           name: generated-content
           path: .
 
-      - name: Convert MD to HTML
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies for HTML conversion
         run: |
-          python md_to_html.py
+          pip install -r requirements.txt
+
+      - name: Convert MD to HTML
+        run: python md_to_html.py
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
